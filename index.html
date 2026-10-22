@@ -512,6 +512,18 @@ function atanRad(x) {            // high precision Dec, radians
   return mk(atanFix(t) * 16n, -FD, FD);
 }
 const abs = a => a.m < 0n ? neg(a) : a;
+
+// Exact y mod x on the decimal values; the result takes the sign of x (floored).
+function modD(y, x) {
+  if (x.m === 0n) throw new Error('Divide by zero');
+  if (y.m === 0n) return ZERO;
+  const e = Math.min(y.e, x.e);
+  if (Math.max(y.e, x.e) - e > 100000) throw new Error('Bad argument');
+  const B = x.m * p10(x.e - e);
+  let r = (y.m * p10(y.e - e)) % B;
+  if (r !== 0n && (r < 0n) !== (B < 0n)) r += B;
+  return mk(r, e);
+}
 function asinRad(x) {
   consts();
   const d = sub(abs(x), ONE, FD).m;
@@ -674,6 +686,7 @@ const fSub = op(2, (y, x) => [sub(y, x)]);
 const fMul = op(2, (y, x) => [mul(y, x)]);
 const fDiv = op(2, (y, x) => [div(y, x)]);
 const fInv = op(1, x => [div(ONE, x)]);
+const fMod = op(2, (y, x) => [modD(y, x)]);
 const fSqrt = op(1, x => [sqrtD(x)]);
 const fSq = op(1, x => [mul(x, x)]);
 const fPow = op(2, (y, x) => [powD(y, x)]);
@@ -703,7 +716,8 @@ const KEYS = [
            [['sin<sup>-1</sup>', fAsin], ['cos<sup>-1</sup>', fAcos], ['tan<sup>-1</sup>', fAtan]]] },
   { id: '8', main: '8', tap: digit('8') },
   { id: '9', main: '9', tap: digit('9') },
-  { id: 'div', main: '÷', cls: 'op', alt: '1/x', tap: fDiv, menu: [[['1/x', fInv]]] },
+  { id: 'div', main: '÷', cls: 'op', alt: '1/x MOD', tap: fDiv,
+    menu: [[['1/x', fInv], ['MOD', fMod]]] },
 
   { id: 'back', main: '←', cls: 'ctl', tap: back, repeat: true },
   { id: '4', main: '4', tap: digit('4') },
