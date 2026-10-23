@@ -1,0 +1,1086 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#121418">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="jCALC">
+<title>jCALC</title>
+<style>
+:root {
+  --bg: #121418;
+  --panel: #181b21;
+  --text: #e8eaed;
+  --dim: #6f7782;
+  --line: #23272e;
+  --key: #2a2e36;
+  --key-down: #424854;
+  --key-text: #f1f3f5;
+  --ctl: #33303a;
+  --ctl-down: #4b4656;
+  --op: #2c3a4f;
+  --op-down: #41557a;
+  --enter: #d9822b;
+  --enter-down: #f19a40;
+  --enter-text: #1d1206;
+  --alt: #e3a557;
+  --menu: #252a33;
+  --menu-border: #3a414d;
+  --menu-hi: #d9822b;
+  --menu-hi-text: #1d1206;
+  --err: #ff7070;
+  --info: #4a5363;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Roboto Mono", "DejaVu Sans Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #eef0f3;
+    --panel: #ffffff;
+    --text: #15181d;
+    --dim: #8a929c;
+    --line: #e2e5ea;
+    --key: #ffffff;
+    --key-down: #d5d9e0;
+    --key-text: #15181d;
+    --ctl: #e6e1ee;
+    --ctl-down: #cfc6dd;
+    --op: #dde6f3;
+    --op-down: #bccce4;
+    --enter: #e08a32;
+    --enter-down: #c97624;
+    --enter-text: #ffffff;
+    --alt: #b8691a;
+    --menu: #ffffff;
+    --menu-border: #cfd4db;
+    --menu-hi: #e08a32;
+    --menu-hi-text: #ffffff;
+    --err: #d32f2f;
+    --info: #4a5363;
+  }
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; overflow: hidden;
+  background: var(--bg); color: var(--text);
+  font-family: var(--sans);
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+#app {
+  display: flex; flex-direction: column;
+  height: 100vh; height: 100dvh;
+  max-width: 560px; margin: 0 auto;
+  padding-top: env(safe-area-inset-top);
+}
+header {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 6px 14px 4px; font-size: 12px; color: var(--dim);
+  letter-spacing: .04em; flex: none;
+}
+header b { color: var(--alt); font-weight: 700; letter-spacing: .08em; }
+#display {
+  flex: 1 1 auto; min-height: 0; position: relative;
+  display: flex; flex-direction: column;
+  background: var(--panel);
+  margin: 0 8px; border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+#stack {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden;
+  display: flex; flex-direction: column;
+  padding: 6px 12px;
+  touch-action: pan-y;
+  font-family: var(--mono);
+  font-size: clamp(16px, 5vw, 22px);
+  scrollbar-width: thin;
+}
+#stack .spacer { flex: 1 1 auto; }
+.row {
+  display: flex; align-items: baseline; gap: 1ch;
+  padding: 3px 0; line-height: 1.25;
+  border-top: 1px solid var(--line);
+  white-space: nowrap;
+}
+.row:first-of-type { border-top: none; }
+.lvl { color: var(--dim); flex: none; text-align: right; }
+.val { flex: 1 1 auto; text-align: right; overflow: hidden; }
+#entry {
+  flex: none;
+  font-family: var(--mono);
+  font-size: clamp(20px, 6.4vw, 28px);
+  height: 0; padding: 0 12px;
+  overflow: hidden;
+  border-top: 1px solid transparent;
+  transition: height .12s ease, padding .12s ease;
+  white-space: nowrap;
+  display: flex; align-items: center;
+}
+#entry.open {
+  height: 1.9em; border-top-color: var(--line);
+}
+#entryText {
+  flex: 1 1 auto; overflow-x: auto; text-align: right;
+  scrollbar-width: none;
+}
+#entryText::-webkit-scrollbar { display: none; }
+#entryText::after {
+  content: ""; display: inline-block; width: 2px; height: 1em;
+  margin-left: 2px; vertical-align: -0.12em;
+  background: var(--alt); animation: blink 1s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+#msg {
+  position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%);
+  background: var(--err); color: #fff; font-size: 14px; font-weight: 600;
+  padding: 5px 12px; border-radius: 999px; pointer-events: none;
+  opacity: 0; transition: opacity .15s ease; white-space: nowrap;
+}
+#msg.show { opacity: 1; }
+#msg.info { background: var(--info); }
+.row.sel { background: var(--line); border-radius: 6px; }
+#entry.open ~ #msg { bottom: calc(1.9 * clamp(20px, 6.4vw, 28px) + 10px); }
+#keys {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(4, 1fr);
+  gap: 8px;
+  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  height: min(46vh, 400px); height: min(46dvh, 400px);
+  min-height: 240px;
+  touch-action: none;
+}
+.key {
+  position: relative;
+  border: none; border-radius: 12px; margin: 0; padding: 0;
+  background: var(--key); color: var(--key-text);
+  font-family: var(--sans); font-size: clamp(22px, 7vw, 30px); font-weight: 500;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 1px 0 rgba(0,0,0,.25);
+  cursor: pointer; touch-action: none;
+  -webkit-user-select: none; user-select: none;
+  outline: none;
+}
+.key.ctl { background: var(--ctl); }
+.key.op { background: var(--op); }
+.key.enter {
+  grid-row: span 2; background: var(--enter); color: var(--enter-text);
+  font-size: clamp(14px, 4.2vw, 18px); font-weight: 700; letter-spacing: .06em;
+}
+.key.down { background: var(--key-down); }
+.key.ctl.down { background: var(--ctl-down); }
+.key.op.down { background: var(--op-down); }
+.key.enter.down { background: var(--enter-down); }
+.key .alt {
+  position: absolute; top: 5px; left: 0; right: 0;
+  font-size: clamp(9px, 2.6vw, 11px); font-weight: 600; letter-spacing: .03em;
+  color: var(--alt); text-align: center; pointer-events: none;
+  white-space: nowrap; overflow: hidden;
+}
+.key.enter .alt { color: var(--enter-text); opacity: .75; top: 8px; }
+.key .main { pointer-events: none; }
+.key sup, .mi sup, .key sub, .mi sub {
+  font-size: .6em; line-height: 0; position: relative; vertical-align: baseline;
+}
+.key sup, .mi sup { top: -.75em; margin-left: .05em; }
+.key sub, .mi sub { top: .3em; margin-left: .05em; }
+.key.minus { color: var(--alt); }
+#overlay { position: fixed; inset: 0; z-index: 9; display: none; }
+#overlay.open { display: block; }
+#menu {
+  position: fixed; z-index: 10; display: none;
+  background: var(--menu); border: 1px solid var(--menu-border);
+  border-radius: 14px; padding: 6px;
+  box-shadow: 0 10px 30px rgba(0,0,0,.45);
+  flex-direction: column; gap: 6px;
+  touch-action: none;
+}
+#menu.open { display: flex; }
+.mrow { display: flex; gap: 6px; }
+.mi {
+  min-width: 64px; height: 52px; padding: 0 14px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 10px; background: var(--key); color: var(--key-text);
+  font-size: 20px; font-weight: 500; white-space: nowrap;
+  flex: 1 1 0;
+}
+.mi.hi { background: var(--menu-hi); color: var(--menu-hi-text); }
+#measure { position: absolute; visibility: hidden; white-space: pre; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header><b>jCALC</b><span id="info">RPN</span></header>
+  <div id="display">
+    <div id="stack"></div>
+    <div id="entry"><span id="entryText"></span></div>
+    <div id="msg"></div>
+  </div>
+  <div id="keys"></div>
+</div>
+<div id="overlay"></div>
+<div id="menu"></div>
+
+<script id="math">
+'use strict';
+/* ---------------------------------------------------------------------------
+ * Decimal floating point on top of BigInt.
+ * A value is m * 10^e with m a BigInt and e a Number, kept canonical:
+ * |m| has at most `prec` digits and no trailing zeros (zero is 0n * 10^0).
+ * Transcendental functions are evaluated in fixed point with FD fractional
+ * digits and then rounded back to P significant digits.
+ * ------------------------------------------------------------------------- */
+const P = 34;             // significant digits kept on the stack
+const FD = 90;            // fractional digits for internal fixed-point math
+const S = 10n ** BigInt(FD);
+const MAXE = 1e15;        // exponent limit
+
+class Dec { constructor(m, e) { this.m = m; this.e = e; } }
+
+const p10cache = new Map();
+function p10(n) {
+  let v = p10cache.get(n);
+  if (v === undefined) { v = 10n ** BigInt(n); if (n < 256) p10cache.set(n, v); }
+  return v;
+}
+const nd = m => (m < 0n ? -m : m).toString().length;
+
+function mk(m, e, prec = P) {
+  if (m === 0n) return ZERO;
+  const neg = m < 0n;
+  if (neg) m = -m;
+  const d = m.toString().length;
+  if (d > prec) {
+    const drop = d - prec, q = p10(drop), r = m % q;
+    m /= q;
+    if (2n * r >= q) m += 1n;
+    e += drop;
+  }
+  while (m % 10n === 0n) { m /= 10n; e++; }
+  if (e + nd(m) > MAXE) throw new Error('Overflow');
+  if (e < -MAXE) return ZERO;
+  return new Dec(neg ? -m : m, e);
+}
+
+const ZERO = new Dec(0n, 0);
+const ONE = new Dec(1n, 0);
+const TWO = new Dec(2n, 0);
+const TEN = new Dec(1n, 1);
+
+const mag = a => a.e + nd(a.m);         // exponent just above the leading digit
+const isInt = a => a.e >= 0;
+const neg = a => new Dec(-a.m, a.e);
+
+function add(a, b, prec = P) {
+  if (a.m === 0n) return mk(b.m, b.e, prec);
+  if (b.m === 0n) return mk(a.m, a.e, prec);
+  const ma = mag(a), mb = mag(b);
+  if (ma - mb > prec + 2) return mk(a.m, a.e, prec);
+  if (mb - ma > prec + 2) return mk(b.m, b.e, prec);
+  if (a.e < b.e) return mk(a.m + b.m * p10(b.e - a.e), a.e, prec);
+  return mk(a.m * p10(a.e - b.e) + b.m, b.e, prec);
+}
+const sub = (a, b, prec = P) => add(a, neg(b), prec);
+const mul = (a, b, prec = P) => mk(a.m * b.m, a.e + b.e, prec);
+
+function div(a, b, prec = P) {
+  if (b.m === 0n) throw new Error('Divide by zero');
+  if (a.m === 0n) return ZERO;
+  const sh = Math.max(0, prec + 3 + nd(b.m) - nd(a.m));
+  return mk(a.m * p10(sh) / b.m, a.e - b.e - sh, prec);
+}
+
+function isqrt(n) {
+  if (n < 2n) return n;
+  let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2));
+  for (;;) {
+    const y = (x + n / x) >> 1n;
+    if (y >= x) return x;
+    x = y;
+  }
+}
+
+function sqrtD(a, prec = P) {
+  if (a.m < 0n) throw new Error('Bad argument');
+  if (a.m === 0n) return ZERO;
+  let m = a.m, e = a.e;
+  if (e % 2 !== 0) { m *= 10n; e -= 1; }
+  let ex = 2 * (prec + 3) - nd(m);
+  if (ex > 0) { ex += ex % 2; m *= p10(ex); e -= ex; }
+  return mk(isqrt(m), e / 2, prec);
+}
+
+// --- fixed point helpers (scale S = 10^FD) ---
+function toFix(a) {
+  const s = a.e + FD;
+  if (s >= 0) return a.m * p10(s);
+  if (-s > nd(a.m) + 1) return 0n;
+  return a.m / p10(-s);
+}
+
+function atanhFix(t) {           // atanh(t) for small |t|
+  const t2 = t * t / S;
+  let term = t, sum = t;
+  for (let k = 3n; ; k += 2n) {
+    term = term * t2 / S;
+    if (term === 0n) break;
+    sum += term / k;
+  }
+  return sum;
+}
+
+function atanFix(t) {            // atan(t) for small |t|
+  const t2 = t * t / S;
+  let term = t, sum = t;
+  for (let k = 3n; ; k += 2n) {
+    term = -term * t2 / S;
+    if (term === 0n) break;
+    sum += term / k;
+  }
+  return sum;
+}
+
+let LN2 = 0n, LN10 = 0n, PI = 0n, PI_D, HALFPI_D, RAD2DEG, DEG2RAD;
+function consts() {
+  if (LN2) return;
+  LN2 = 2n * atanhFix(S / 3n);                 // ln 2 = 2 atanh(1/3)
+  LN10 = 3n * LN2 + 2n * atanhFix(S / 9n);     // ln 10 = 3 ln 2 + ln 1.25
+  PI = 16n * atanFix(S / 5n) - 4n * atanFix(S / 239n);   // Machin
+  PI_D = mk(PI, -FD, FD);
+  HALFPI_D = mk(PI * 5n, -FD - 1, FD);
+  RAD2DEG = mk(180n * S * S / PI, -FD, FD);
+  DEG2RAD = mk(PI, -FD - 1, FD - 1);
+  DEG2RAD = div(DEG2RAD, new Dec(18n, 0), FD);
+}
+const piD = () => { consts(); return mk(PI_D.m, PI_D.e); };
+
+function lnFix(a) {
+  if (a.m <= 0n) throw new Error('Bad argument');
+  consts();
+  const k = nd(a.m), E = a.e + k - 1;          // a = y * 10^E, 1 <= y < 10
+  let y = a.m * p10(FD - (k - 1));
+  let j = 0n;
+  while (y > S * 3n / 2n) { y /= 2n; j++; }    // y in [0.75, 1.5]
+  const t = (y - S) * S / (y + S);
+  return 2n * atanhFix(t) + j * LN2 + BigInt(E) * LN10;
+}
+
+const lnD = a => mk(lnFix(a), -FD);
+function log10D(a) {
+  if (a.m === 1n) return mk(BigInt(a.e), 0);   // exact powers of ten
+  return mk(lnFix(a) * S / LN10, -FD);
+}
+const log2D = a => mk(lnFix(a) * S / LN2, -FD);
+
+function expD(a, prec = P) {
+  if (a.m === 0n) return ONE;
+  if (mag(a) > 17) { if (a.m > 0n) throw new Error('Overflow'); return ZERO; }
+  consts();
+  const X = toFix(a);
+  let q = X / LN10, r = X - q * LN10;          // e^x = e^r * 10^q
+  if (r < 0n) { r += LN10; q -= 1n; }
+  let j = 0;
+  while (r >= LN2) { r -= LN2; j++; }          // e^r = e^r' * 2^j
+  const H = 12;
+  r >>= BigInt(H);
+  let sum = S, term = S;
+  for (let k = 1n; ; k++) {
+    term = term * r / S / k;
+    if (term === 0n) break;
+    sum += term;
+  }
+  for (let i = 0; i < H; i++) sum = sum * sum / S;
+  return mk(sum << BigInt(j), Number(q) - FD, prec);
+}
+
+function powD(x, y) {
+  if (y.m === 0n) return ONE;
+  if (isInt(y) && mag(y) <= 10) {               // exact-ish integer power
+    let n = y.m * p10(y.e);
+    const negExp = n < 0n;
+    if (negExp) n = -n;
+    if (x.m === 0n) { if (negExp) throw new Error('Divide by zero'); return ZERO; }
+    const wp = P + 12;
+    let r = ONE, b = mk(x.m, x.e, wp);
+    while (n > 0n) {
+      if (n & 1n) r = mul(r, b, wp);
+      n >>= 1n;
+      if (n > 0n) b = mul(b, b, wp);
+    }
+    if (negExp) {
+      if (r.m === 0n) throw new Error('Overflow');
+      return div(ONE, r);
+    }
+    return mk(r.m, r.e);
+  }
+  if (x.m === 0n) {
+    if (y.m > 0n) return ZERO;
+    throw new Error('Divide by zero');
+  }
+  let sign = 1n;
+  if (x.m < 0n) {
+    if (!isInt(y)) throw new Error('Bad argument');
+    if (y.e === 0 && (y.m & 1n)) sign = -1n;
+    x = neg(x);
+  }
+  const l = mk(lnFix(x), -FD, FD);
+  const r = expD(mul(y, l, FD));
+  return new Dec(sign * r.m, r.e);
+}
+
+function pow10D(x) {
+  if (isInt(x) && mag(x) <= 16) return mk(1n, Number(x.m * p10(x.e)));
+  return powD(TEN, x);
+}
+const pow2D = x => powD(TWO, x);
+
+// --- trigonometry; `deg` selects degrees instead of radians ---
+function sinCosFix(X) {          // [sin, cos] of fixed-point radians
+  consts();
+  const half = PI / 2n;
+  let k = X / half, r = X - k * half;
+  if (2n * r > half) { r -= half; k++; }
+  else if (2n * r < -half) { r += half; k--; }  // |r| <= pi/4
+  const r2 = r * r / S;
+  let s = r, ts = r, c = S, tc = S;
+  for (let i = 1n; ; i++) {
+    ts = -ts * r2 / S / ((2n * i) * (2n * i + 1n));
+    tc = -tc * r2 / S / ((2n * i - 1n) * (2n * i));
+    if (ts === 0n && tc === 0n) break;
+    s += ts; c += tc;
+  }
+  switch (Number(((k % 4n) + 4n) % 4n)) {
+    case 0: return [s, c];
+    case 1: return [c, -s];
+    case 2: return [-s, -c];
+    default: return [-c, s];
+  }
+}
+
+function mod360(x) {             // exact x mod 360 in [0, 360)
+  if (x.e >= 0) {
+    let n = x.m * p10(x.e) % 360n;
+    if (n < 0n) n += 360n;
+    return mk(n, 0);
+  }
+  const M = 360n * p10(-x.e);
+  let r = x.m % M;
+  if (r < 0n) r += M;
+  return mk(r, x.e);
+}
+
+function trigD(x, fn, deg) {     // fn: 0 sin, 1 cos, 2 tan
+  consts();
+  if (mag(x) > 60) throw new Error('Bad argument');
+  if (deg) {
+    if (mag(x) >= -20) {
+      x = mod360(x);
+      if (x.e >= 0 && (x.m * p10(x.e)) % 90n === 0n) {   // exact quadrant angles
+        const q = Number(x.m * p10(x.e) / 90n);
+        if (fn === 0) return [ZERO, ONE, ZERO, neg(ONE)][q];
+        if (fn === 1) return [ONE, ZERO, neg(ONE), ZERO][q];
+        if (q % 2) throw new Error('Infinite result');
+        return ZERO;
+      }
+    }
+    x = mul(x, DEG2RAD, FD);
+  }
+  if (mag(x) < -20) return fn === 1 ? ONE : mk(x.m, x.e);
+  const [s, c] = sinCosFix(toFix(x));
+  if (fn === 0) return mk(s, -FD);
+  if (fn === 1) return mk(c, -FD);
+  if (c === 0n) throw new Error('Infinite result');
+  return mk(s * S / c, -FD);
+}
+
+function atanRad(x) {            // high precision Dec, radians
+  consts();
+  if (x.m === 0n || mag(x) < -20) return x;
+  if (mag(x) > 1 || nd(x.m) + x.e > 0 && sub(abs(x), ONE, FD).m > 0n) {
+    const inner = atanRad(div(ONE, x, FD));
+    return sub(x.m > 0n ? HALFPI_D : neg(HALFPI_D), inner, FD);
+  }
+  let t = toFix(x);
+  for (let i = 0; i < 4; i++) t = t * S / (S + isqrt(S * S + t * t));   // halve the angle
+  return mk(atanFix(t) * 16n, -FD, FD);
+}
+const abs = a => a.m < 0n ? neg(a) : a;
+
+// Exact y mod x on the decimal values; the result takes the sign of x (floored).
+function modD(y, x) {
+  if (x.m === 0n) throw new Error('Divide by zero');
+  if (y.m === 0n) return ZERO;
+  const e = Math.min(y.e, x.e);
+  if (Math.max(y.e, x.e) - e > 100000) throw new Error('Bad argument');
+  const B = x.m * p10(x.e - e);
+  let r = (y.m * p10(y.e - e)) % B;
+  if (r !== 0n && (r < 0n) !== (B < 0n)) r += B;
+  return mk(r, e);
+}
+function asinRad(x) {
+  consts();
+  const d = sub(abs(x), ONE, FD).m;
+  if (d > 0n) throw new Error('Bad argument');
+  if (d === 0n) return x.m > 0n ? HALFPI_D : neg(HALFPI_D);
+  if (mag(x) < -20) return x;
+  return atanRad(div(x, sqrtD(sub(ONE, mul(x, x, FD), FD), FD), FD));
+}
+const acosRad = x => sub(HALFPI_D, asinRad(x), FD);
+const fromRad = (r, deg) => deg ? mul(r, RAD2DEG) : mk(r.m, r.e);
+const asinD = (x, deg) => fromRad(asinRad(x), deg);
+const acosD = (x, deg) => fromRad(acosRad(x), deg);
+const atanD = (x, deg) => fromRad(atanRad(x), deg);
+
+// Format with at most `sig` significant digits, using E notation when needed.
+function fmt(a, sig) {
+  if (a.m === 0n) return '0';
+  const r = mk(a.m, a.e, sig);
+  const negv = r.m < 0n;
+  const ds = (negv ? -r.m : r.m).toString();
+  const n = ds.length, X = r.e + n - 1;
+  let s;
+  if (X >= -5 && X < sig) {
+    if (r.e >= 0) s = ds + '0'.repeat(r.e);
+    else if (X >= 0) s = ds.slice(0, X + 1) + '.' + ds.slice(X + 1);
+    else s = '0.' + '0'.repeat(-X - 1) + ds;
+  } else {
+    s = ds[0] + (n > 1 ? '.' + ds.slice(1) : '') + 'E' + X;
+  }
+  return (negv ? '-' : '') + s;
+}
+
+// Longest representation (up to P digits) that fits in maxChars.
+function fitFmt(a, maxChars) {
+  let sig = P, s = fmt(a, sig);
+  while (s.length > maxChars && sig > 1) {
+    sig = Math.max(1, Math.min(sig - 1, sig - (s.length - maxChars)));
+    s = fmt(a, sig);
+  }
+  return s;
+}
+
+function parseNum(s) {
+  const mt = /^(-?)(\d*)(?:\.(\d*))?(?:E(-?)(\d*))?$/.exec(s);
+  if (!mt) throw new Error('Invalid entry');
+  const sg = mt[1], ip = mt[2] || '', fp = mt[3] || '', es = mt[4], ed = mt[5] || '';
+  const hasE = s.includes('E');
+  let digits = ip + fp;
+  if (!digits) {
+    if (!hasE || s.includes('.')) throw new Error('Invalid entry');
+    digits = '1';                                  // "E5" means 1E5
+  }
+  if (ed.replace(/^0+/, '').length > 15) throw new Error(es ? 'Underflow' : 'Overflow');
+  const ex = (es ? -1 : 1) * Number(ed || 0);
+  return mk(BigInt(sg + digits), ex - fp.length);
+}
+</script>
+
+<script>
+'use strict';
+/* ---------------------------------------------------------------------------
+ * Calculator state and operations
+ * ------------------------------------------------------------------------- */
+let stack = [];          // stack[stack.length - 1] is level 1
+let entry = '';
+let deg = true;          // angle mode: degrees (true) or radians
+
+const $ = id => document.getElementById(id);
+const stackEl = $('stack'), entryEl = $('entry'), entryTextEl = $('entryText');
+const msgEl = $('msg'), keysEl = $('keys'), menuEl = $('menu'), overlayEl = $('overlay');
+
+let msgTimer = 0;
+function flash(text, info = false) {
+  msgEl.textContent = text;
+  msgEl.classList.toggle('info', info);
+  msgEl.classList.add('show');
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => msgEl.classList.remove('show'), 2000);
+}
+function clearMsg() { msgEl.classList.remove('show'); }
+
+function commitEntry() {
+  if (!entry) return true;
+  try { stack.push(parseNum(entry)); }
+  catch (e) { flash(e.message); return false; }
+  entry = '';
+  return true;
+}
+
+// Wrap an n-argument stack function. f receives (level n, ..., level 1)
+// and returns an array of results that replace them.
+function op(n, f) {
+  return () => {
+    if (!commitEntry()) return update();
+    if (stack.length < n) { flash('Too few arguments'); return update(); }
+    try {
+      const res = f(...stack.slice(stack.length - n));
+      stack.splice(stack.length - n, n, ...res);
+    } catch (e) {
+      flash(e instanceof RangeError ? 'Overflow' : e.message);
+    }
+    update();
+  };
+}
+
+function digit(d) { return () => { entry += d; update(); }; }
+function point() {
+  if (/[.E]/.test(entry)) return;
+  entry += (entry === '' || entry === '-') ? '0.' : '.';
+  update();
+}
+function expo() {
+  if (entry.endsWith('E')) { entry += '-'; return update(); }   // key acts as "-"
+  if (entry.includes('E')) return;
+  entry += 'E';
+  update();
+}
+function back() {
+  if (entry) entry = entry.slice(0, -1);
+  else if (stack.length) entry = fmt(stack.pop(), P);
+  else flash('Too few arguments');
+  update();
+}
+function drop() {
+  if (entry) entry = '';
+  else if (stack.length) stack.pop();
+  update();
+}
+function clearAll() { entry = ''; stack = []; update(); }
+function enter() {
+  if (entry) commitEntry();
+  else if (stack.length) stack.push(stack[stack.length - 1]);
+  update();
+}
+function chs() {
+  if (!entry) return op(1, x => [neg(x)])();
+  const i = entry.indexOf('E');
+  if (i >= 0) {
+    entry = entry[i + 1] === '-'
+      ? entry.slice(0, i + 1) + entry.slice(i + 2)
+      : entry.slice(0, i + 1) + '-' + entry.slice(i + 1);
+  } else {
+    entry = entry[0] === '-' ? entry.slice(1) : '-' + entry;
+  }
+  update();
+}
+function rot(down) {
+  return () => {
+    if (!commitEntry()) return update();
+    if (stack.length > 1) {
+      if (down) stack.unshift(stack.pop());   // level 1 goes to the top
+      else stack.push(stack.shift());         // top comes down to level 1
+    }
+    update();
+  };
+}
+
+const fAdd = op(2, (y, x) => [add(y, x)]);
+const fSub = op(2, (y, x) => [sub(y, x)]);
+const fMul = op(2, (y, x) => [mul(y, x)]);
+const fDiv = op(2, (y, x) => [div(y, x)]);
+const fInv = op(1, x => [div(ONE, x)]);
+const fMod = op(2, (y, x) => [modD(y, x)]);
+const fSqrt = op(1, x => [sqrtD(x)]);
+const fSq = op(1, x => [mul(x, x)]);
+const fPow = op(2, (y, x) => [powD(y, x)]);
+const fSwap = op(2, (y, x) => [x, y]);
+const fLn = op(1, x => [lnD(x)]);
+const fExp = op(1, x => [expD(x)]);
+const fLog = op(1, x => [log10D(x)]);
+const fAlog = op(1, x => [pow10D(x)]);
+const fLog2 = op(1, x => [log2D(x)]);
+const fAlog2 = op(1, x => [pow2D(x)]);
+const fSin = op(1, x => [trigD(x, 0, deg)]);
+const fCos = op(1, x => [trigD(x, 1, deg)]);
+const fTan = op(1, x => [trigD(x, 2, deg)]);
+const fAsin = op(1, x => [asinD(x, deg)]);
+const fAcos = op(1, x => [acosD(x, deg)]);
+const fAtan = op(1, x => [atanD(x, deg)]);
+const fPi = op(0, () => [piD()]);
+function toggleAngle() { deg = !deg; update(); }
+
+/* ---------------------------------------------------------------------------
+ * Keypad definition
+ * ------------------------------------------------------------------------- */
+const KEYS = [
+  { id: 'drop', main: '↓', cls: 'ctl', alt: 'CLR', tap: drop, menu: [[['CLEAR', clearAll]]] },
+  { id: '7', main: '7', alt: 'TRIG', tap: digit('7'),
+    menu: [[['sin', fSin], ['cos', fCos], ['tan', fTan]],
+           [['sin<sup>-1</sup>', fAsin], ['cos<sup>-1</sup>', fAcos], ['tan<sup>-1</sup>', fAtan]]] },
+  { id: '8', main: '8', tap: digit('8') },
+  { id: '9', main: '9', tap: digit('9') },
+  { id: 'div', main: '÷', cls: 'op', alt: '1/x MOD', tap: fDiv,
+    menu: [[['1/x', fInv], ['MOD', fMod]]] },
+
+  { id: 'back', main: '←', cls: 'ctl', tap: back, repeat: true },
+  { id: '4', main: '4', tap: digit('4') },
+  { id: '5', main: '5', tap: digit('5') },
+  { id: '6', main: '6', tap: digit('6') },
+  { id: 'mul', main: '×', cls: 'op', alt: '√ x² xʸ', tap: fMul,
+    menu: [[['√x', fSqrt], ['x<sup>2</sup>', fSq], ['x<sup>y</sup>', fPow]]] },
+
+  { id: 'enter', main: 'ENTER', cls: 'enter', alt: 'SWAP ROT', tap: enter,
+    menu: [[['SWAP', fSwap], ['ROT↓', rot(true)], ['ROT↑', rot(false)]]] },
+  { id: '1', main: '1', tap: digit('1') },
+  { id: '2', main: '2', tap: digit('2') },
+  { id: '3', main: '3', tap: digit('3') },
+  { id: 'sub', main: '−', cls: 'op', alt: '+/−', tap: fSub, menu: [[['+/−', chs]]] },
+
+  { id: '0', main: '0', alt: 'CONST', tap: digit('0'), menu: [[['π', fPi]]] },
+  { id: 'dot', main: '.', alt: 'MODE', tap: point,
+    menu: () => [[[deg ? 'RAD' : 'DEG', toggleAngle]]] },
+  { id: 'E', main: 'E', alt: 'LOG EXP', tap: expo,
+    menu: [[['ln', fLn], ['e<sup>x</sup>', fExp]],
+           [['log', fLog], ['10<sup>x</sup>', fAlog]],
+           [['log<sub>2</sub>', fLog2], ['2<sup>x</sup>', fAlog2]]] },
+  { id: 'add', main: '+', cls: 'op', tap: fAdd },
+];
+const keyById = {};
+for (const k of KEYS) {
+  keyById[k.id] = k;
+  const b = document.createElement('button');
+  b.className = 'key' + (k.cls ? ' ' + k.cls : '');
+  b.dataset.id = k.id;
+  b.type = 'button';
+  b.innerHTML = (k.alt ? `<span class="alt">${k.alt}</span>` : '') + `<span class="main">${k.main}</span>`;
+  keysEl.appendChild(b);
+}
+
+const keyE = keysEl.querySelector('[data-id="E"]');
+
+/* ---------------------------------------------------------------------------
+ * Rendering
+ * ------------------------------------------------------------------------- */
+let charW = 12;
+function measure() {
+  const m = document.createElement('span');
+  m.id = 'measure';
+  m.textContent = '0'.repeat(20);
+  stackEl.appendChild(m);
+  charW = m.getBoundingClientRect().width / 20 || 12;
+  m.remove();
+}
+
+function render() {
+  const n = stack.length;
+  const lw = String(n).length + 1;
+  const style = getComputedStyle(stackEl);
+  const inner = stackEl.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const maxChars = Math.max(6, Math.floor(inner / charW) - lw - 1);
+  let html = '<div class="spacer"></div>';
+  for (let i = 0; i < n; i++) {
+    const level = n - i;
+    html += `<div class="row" data-i="${i}"><span class="lvl" style="width:${lw}ch">${level}:</span>` +
+            `<span class="val">${fitFmt(stack[i], maxChars)}</span></div>`;
+  }
+  stackEl.innerHTML = html;
+  stackEl.scrollTop = stackEl.scrollHeight;
+
+  entryEl.classList.toggle('open', entry !== '');
+  entryTextEl.textContent = entry;
+  entryTextEl.scrollLeft = entryTextEl.scrollWidth;
+  $('info').textContent = (deg ? 'DEG' : 'RAD') + (n ? ` · depth ${n}` : '');
+  const eMinus = entry.endsWith('E');
+  keyE.classList.toggle('minus', eMinus);
+  keyE.querySelector('.main').textContent = eMinus ? '−' : 'E';
+}
+
+function save() {
+  try {
+    localStorage.setItem('jcalc.state', JSON.stringify({
+      s: stack.map(d => [d.m.toString(), d.e]), e: entry, deg,
+    }));
+  } catch (e) { /* storage unavailable */ }
+}
+function load() {
+  try {
+    const st = JSON.parse(localStorage.getItem('jcalc.state') || 'null');
+    if (st && Array.isArray(st.s)) {
+      stack = st.s.map(([m, e]) => mk(BigInt(m), e));
+      entry = typeof st.e === 'string' ? st.e : '';
+      if (typeof st.deg === 'boolean') deg = st.deg;
+    }
+  } catch (e) { stack = []; entry = ''; }
+}
+
+function update() { render(); save(); }
+
+/* ---------------------------------------------------------------------------
+ * Touch / mouse handling: tap and hold-slide-release menus
+ * ------------------------------------------------------------------------- */
+const HOLD_MS = 320;
+let gest = null;          // active press on a key
+let sticky = false;       // menu left open for tapping
+let menuHi = null;
+
+function buzz() { try { navigator.vibrate && navigator.vibrate(12); } catch (e) {} }
+
+function openMenu(k, btn) {
+  const br = btn.getBoundingClientRect();
+  showMenu(typeof k.menu === 'function' ? k.menu() : k.menu, br.left + br.width / 2, br.top - 10, br.bottom + 10);
+}
+// Show menu rows centered on x, above `above` if it fits, else below `below`.
+function showMenu(rows, x, above, below) {
+  menuEl.innerHTML = '';
+  for (const row of rows) {
+    const r = document.createElement('div');
+    r.className = 'mrow';
+    for (const [label, fn] of row) {
+      const it = document.createElement('div');
+      it.className = 'mi';
+      it.innerHTML = label;
+      it._fn = fn;
+      r.appendChild(it);
+    }
+    menuEl.appendChild(r);
+  }
+  menuEl.classList.add('open');
+  const mw = menuEl.offsetWidth, mh = menuEl.offsetHeight;
+  const vw = document.documentElement.clientWidth;
+  const left = Math.min(Math.max(8, x - mw / 2), vw - mw - 8);
+  const top = above - mh >= 8 ? above - mh : Math.max(8, below);
+  menuEl.style.left = left + 'px';
+  menuEl.style.top = top + 'px';
+  menuHi = null;
+}
+function closeMenu() {
+  menuEl.classList.remove('open');
+  overlayEl.classList.remove('open');
+  for (const r of stackEl.querySelectorAll('.row.sel')) r.classList.remove('sel');
+  sticky = false;
+  menuHi = null;
+}
+function setHi(it) {
+  if (it === menuHi) return;
+  if (menuHi) menuHi.classList.remove('hi');
+  menuHi = it;
+  if (it) { it.classList.add('hi'); buzz(); }
+}
+function itemAt(x, y) {
+  const el = document.elementFromPoint(x, y);
+  return el ? el.closest('.mi') : null;
+}
+function runItem(it) { closeMenu(); clearMsg(); it._fn(); }
+
+keysEl.addEventListener('pointerdown', e => {
+  const btn = e.target.closest('.key');
+  if (!btn || gest) return;
+  e.preventDefault();
+  const k = keyById[btn.dataset.id];
+  clearMsg();
+  btn.classList.add('down');
+  try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+  gest = { btn, k, pid: e.pointerId, menu: false, timer: 0 };
+  if (!k.menu) {
+    const wasEntry = entry !== '';
+    k.tap();
+    if (k.repeat && wasEntry) {
+      gest.timer = setTimeout(function rep() {
+        if (!gest || !entry) return;
+        k.tap();
+        gest.timer = setTimeout(rep, 70);
+      }, 450);
+    }
+    return;
+  }
+  gest.timer = setTimeout(() => {
+    if (!gest) return;
+    gest.menu = true;
+    openMenu(k, btn);
+    buzz();
+  }, HOLD_MS);
+});
+
+keysEl.addEventListener('pointermove', e => {
+  if (!gest || e.pointerId !== gest.pid || !gest.menu) return;
+  setHi(itemAt(e.clientX, e.clientY));
+});
+
+keysEl.addEventListener('pointerup', e => {
+  if (!gest || e.pointerId !== gest.pid) return;
+  const g = gest;
+  gest = null;
+  clearTimeout(g.timer);
+  g.btn.classList.remove('down');
+  const under = document.elementFromPoint(e.clientX, e.clientY);
+  const overBtn = under && under.closest('.key') === g.btn;
+  if (g.menu) {
+    const it = under && under.closest('.mi');
+    if (it) runItem(it);
+    else if (overBtn) { sticky = true; overlayEl.classList.add('open'); setHi(null); }
+    else closeMenu();
+  } else if (g.k.menu && overBtn) {
+    g.k.tap();
+  }
+});
+
+keysEl.addEventListener('pointercancel', e => {
+  if (!gest || e.pointerId !== gest.pid) return;
+  clearTimeout(gest.timer);
+  gest.btn.classList.remove('down');
+  gest = null;
+  closeMenu();
+});
+
+// Menu left open after a hold released on the key: tap an item or outside.
+menuEl.addEventListener('pointerdown', e => {
+  if (!sticky) return;
+  e.preventDefault();
+  setHi(e.target.closest('.mi'));
+});
+menuEl.addEventListener('pointerup', e => {
+  if (!sticky) return;
+  const it = e.target.closest('.mi');
+  if (it) runItem(it);
+});
+overlayEl.addEventListener('pointerdown', e => { e.preventDefault(); closeMenu(); });
+
+/* ---------------------------------------------------------------------------
+ * Copy & paste: long-press (or right-click) in the display area
+ * ------------------------------------------------------------------------- */
+// Turn clipboard text such as "1 234,5", "−2.5e+3" or "6.02×10^23" into entry syntax.
+function cleanNumber(text) {
+  let s = String(text).trim()
+    .replace(/[\s\u00a0\u2009\u202f'_]/g, '')
+    .replace(/[\u2212\u2012\u2013]/g, '-')
+    .replace(/[×x*·]10\^/i, 'E')
+    .replace(/e/g, 'E')
+    .replace(/^\+/, '')
+    .replace(/E\+/, 'E');
+  const dot = s.lastIndexOf('.'), comma = s.lastIndexOf(',');
+  if (dot >= 0 && comma >= 0) {
+    s = dot > comma ? s.replace(/,/g, '') : s.replace(/\./g, '').replace(',', '.');
+  } else if (comma >= 0) {
+    s = s.split(',').length === 2 ? s.replace(',', '.') : s.replace(/,/g, '');
+  }
+  return s;
+}
+
+function pasteText(text) {
+  const s = cleanNumber(text);
+  try {
+    if (!s) throw new Error();
+    parseNum(entry + s);
+  } catch (e) { flash('Invalid paste'); return; }
+  entry += s;
+  update();
+}
+
+async function pasteClipboard() {
+  let text;
+  try { text = await navigator.clipboard.readText(); }
+  catch (e) { flash('Clipboard not accessible'); return; }
+  pasteText(text);
+}
+
+async function copyText(s) {
+  try {
+    await navigator.clipboard.writeText(s);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = s;
+    ta.setAttribute('readonly', '');
+    ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.appendChild(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch (err) {}
+    ta.remove();
+    if (!ok) { flash('Copy failed'); return; }
+  }
+  flash('Copied ' + (s.length > 22 ? s.slice(0, 21) + '…' : s), true);
+}
+
+function openCtx(target, x, y) {
+  const row = target && target.closest && target.closest('.row');
+  const items = [];
+  if (row && stack[row.dataset.i]) {
+    const v = stack[row.dataset.i];
+    row.classList.add('sel');
+    items.push(['Copy', () => copyText(fmt(v, P))]);
+  }
+  items.push(['Paste', pasteClipboard]);
+  showMenu([items], x, y - 16, y + 16);
+  sticky = true;
+  overlayEl.classList.add('open');
+}
+
+const LONG_MS = 450;
+const displayEl = $('display');
+let lp = null;            // pending long-press in the display area
+function lpCancel() { if (lp) { clearTimeout(lp.timer); lp = null; } }
+displayEl.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || lp || gest) return;
+  const t = { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target };
+  t.timer = setTimeout(() => { lp = null; buzz(); openCtx(t.target, t.x, t.y); }, LONG_MS);
+  lp = t;
+});
+displayEl.addEventListener('pointermove', e => {
+  if (lp && e.pointerId === lp.id && Math.hypot(e.clientX - lp.x, e.clientY - lp.y) > 10) lpCancel();
+});
+displayEl.addEventListener('pointerup', lpCancel);
+displayEl.addEventListener('pointercancel', lpCancel);
+displayEl.addEventListener('scroll', lpCancel, true);
+displayEl.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  lpCancel();
+  if (!menuEl.classList.contains('open')) { clearMsg(); openCtx(e.target, e.clientX, e.clientY); }
+});
+
+document.addEventListener('paste', e => {
+  const t = e.clipboardData && e.clipboardData.getData('text');
+  if (!t) return;
+  e.preventDefault();
+  closeMenu();
+  clearMsg();
+  pasteText(t);
+});
+
+document.addEventListener('contextmenu', e => e.preventDefault());
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+/* ---------------------------------------------------------------------------
+ * Physical keyboard
+ * ------------------------------------------------------------------------- */
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'c') {
+    const s = entry || (stack.length ? fmt(stack[stack.length - 1], P) : '');
+    if (s) { e.preventDefault(); copyText(s); }
+    return;
+  }
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key;
+  let fn = null;
+  if (/^[0-9]$/.test(k)) fn = digit(k);
+  else if (k === '.' || k === ',') fn = point;
+  else if (k === 'e' || k === 'E') fn = expo;
+  else if (k === 'Enter' || k === '=') fn = enter;
+  else if (k === 'Backspace') fn = back;
+  else if (k === 'Delete' || k === 'Escape') fn = drop;
+  else if (k === '+') fn = fAdd;
+  else if (k === '-') fn = entry.endsWith('E') ? expo : fSub;
+  else if (k === '*') fn = fMul;
+  else if (k === '/') fn = fDiv;
+  else if (k === '^') fn = fPow;
+  else if (k === 'n') fn = chs;
+  else if (k === 's') fn = fSwap;
+  else if (k === 'r') fn = fSqrt;
+  if (fn) { e.preventDefault(); closeMenu(); clearMsg(); fn(); }
+});
+
+window.addEventListener('resize', () => { measure(); render(); });
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { measure(); render(); });
+
+load();
+measure();
+render();
+</script>
+</body>
+</html>
