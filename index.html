@@ -111,6 +111,7 @@ header b { color: var(--alt); font-weight: 700; letter-spacing: .08em; }
 .row:first-of-type { border-top: none; }
 .lvl { color: var(--dim); flex: none; text-align: right; }
 .val { flex: 1 1 auto; text-align: right; overflow: hidden; }
+.more { color: var(--dim); }
 #entry {
   flex: none;
   font-family: var(--mono);
@@ -513,6 +514,18 @@ function atanRad(x) {            // high precision Dec, radians
 }
 const abs = a => a.m < 0n ? neg(a) : a;
 
+// Clean up rounding noise: cut the digits at the first run of 12+ zeros
+// (rounding down) or 12+ nines (rounding up). Returns null if there is none.
+function cleanRound(a) {
+  if (a.m === 0n) return null;
+  const negv = a.m < 0n, ds = (negv ? -a.m : a.m).toString();
+  const run = /0{12,}|9{12,}/.exec(ds);       // canonical m never ends in 0
+  if (!run) return null;
+  let m = run.index ? BigInt(ds.slice(0, run.index)) : 0n;
+  if (run[0][0] === '9') m += 1n;
+  return mk(negv ? -m : m, a.e + ds.length - run.index);
+}
+
 // Exact y mod x on the decimal values; the result takes the sign of x (floored).
 function modD(y, x) {
   if (x.m === 0n) throw new Error('Divide by zero');
@@ -768,6 +781,25 @@ function measure() {
   m.remove();
 }
 
+// Stack display: all stored digits if they fit, otherwise the digits cut
+// off (not rounded) with a grey ellipsis showing that more digits follow.
+const MORE = '<span class="more">…</span>';
+function dispFmt(a, maxChars) {
+  const full = fmt(a, P);
+  if (full.length <= maxChars) return full;
+  const dot = full.indexOf('.');
+  if (!full.includes('E') && dot >= 0 && dot + 2 <= maxChars - 1) {
+    return full.slice(0, maxChars - 1) + MORE;
+  }
+  const sign = a.m < 0n ? '-' : '';
+  const ds = (a.m < 0n ? -a.m : a.m).toString();
+  const ex = 'E' + (a.e + ds.length - 1);
+  const mant = ds[0] + (ds.length > 1 ? '.' + ds.slice(1) : '');
+  const room = maxChars - sign.length - ex.length;
+  if (mant.length <= room) return sign + mant + ex;
+  return sign + mant.slice(0, Math.max(3, room - 1)) + MORE + ex;
+}
+
 function render() {
   const n = stack.length;
   const lw = String(n).length + 1;
@@ -778,7 +810,7 @@ function render() {
   for (let i = 0; i < n; i++) {
     const level = n - i;
     html += `<div class="row" data-i="${i}"><span class="lvl" style="width:${lw}ch">${level}:</span>` +
-            `<span class="val">${fitFmt(stack[i], maxChars)}</span></div>`;
+            `<span class="val">${dispFmt(stack[i], maxChars)}</span></div>`;
   }
   stackEl.innerHTML = html;
   stackEl.scrollTop = stackEl.scrollHeight;
@@ -1007,6 +1039,13 @@ function openCtx(target, x, y) {
     items.push(['Copy', () => copyText(fmt(v, P))]);
   }
   items.push(['Paste', pasteClipboard]);
+  if (items.length === 2) {
+    const v = stack[row.dataset.i], r = cleanRound(v);
+    if (r) items.push(['→ ' + fitFmt(r, 18), () => {
+      const i = stack.indexOf(v);
+      if (i >= 0) { stack[i] = r; update(); }
+    }]);
+  }
   showMenu([items], x, y - 16, y + 16);
   sticky = true;
   overlayEl.classList.add('open');
