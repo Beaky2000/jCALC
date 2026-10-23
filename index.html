@@ -213,6 +213,10 @@ header b { color: var(--alt); font-weight: 700; letter-spacing: .08em; }
   flex: 1 1 0;
 }
 .mi.hi { background: var(--menu-hi); color: var(--menu-hi-text); }
+.mi .ico {
+  width: .9em; height: .9em; margin-right: .4em; flex: none;
+  fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round;
+}
 #measure { position: absolute; visibility: hidden; white-space: pre; }
 </style>
 </head>
@@ -603,6 +607,7 @@ function parseNum(s) {
 let stack = [];          // stack[stack.length - 1] is level 1
 let entry = '';
 let deg = true;          // angle mode: degrees (true) or radians
+let levels = true;       // show stack level numbers (1:, 2:, ...)
 
 const $ = id => document.getElementById(id);
 const stackEl = $('stack'), entryEl = $('entry'), entryTextEl = $('entryText');
@@ -718,10 +723,15 @@ const fAcos = op(1, x => [acosD(x, deg)]);
 const fAtan = op(1, x => [atanD(x, deg)]);
 const fPi = op(0, () => [piD()]);
 function toggleAngle() { deg = !deg; update(); }
+function toggleLevels() { levels = !levels; update(); }
 
 /* ---------------------------------------------------------------------------
  * Keypad definition
  * ------------------------------------------------------------------------- */
+// "Toggle power" symbol (U+23FB), drawn inline since many fonts lack the glyph.
+const TOGGLE_ICON = '<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">' +
+  '<path d="M7.5 6.2a8 8 0 1 0 9 0" /><path d="M12 3v8" /></svg>';
+
 const KEYS = [
   { id: 'drop', main: '↓', cls: 'ctl', alt: 'CLR', tap: drop, menu: [[['CLEAR', clearAll]]] },
   { id: '7', main: '7', alt: 'TRIG', tap: digit('7'),
@@ -748,7 +758,8 @@ const KEYS = [
 
   { id: '0', main: '0', alt: 'CONST', tap: digit('0'), menu: [[['π', fPi]]] },
   { id: 'dot', main: '.', alt: 'MODE', tap: point,
-    menu: () => [[[deg ? 'RAD' : 'DEG', toggleAngle]]] },
+    menu: () => [[[deg ? 'RAD' : 'DEG', toggleAngle]],
+                 [[TOGGLE_ICON + 'Stack numbers', toggleLevels]]] },
   { id: 'E', main: 'E', alt: 'LOG EXP', tap: expo,
     menu: [[['ln', fLn], ['e<sup>x</sup>', fExp]],
            [['log', fLog], ['10<sup>x</sup>', fAlog]],
@@ -802,14 +813,15 @@ function dispFmt(a, maxChars) {
 
 function render() {
   const n = stack.length;
-  const lw = String(n).length + 1;
+  const lw = levels ? String(n).length + 1 : 0;
   const style = getComputedStyle(stackEl);
   const inner = stackEl.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-  const maxChars = Math.max(6, Math.floor(inner / charW) - lw - 1);
+  const maxChars = Math.max(6, Math.floor(inner / charW) - (levels ? lw + 1 : 0));
   let html = '<div class="spacer"></div>';
   for (let i = 0; i < n; i++) {
     const level = n - i;
-    html += `<div class="row" data-i="${i}"><span class="lvl" style="width:${lw}ch">${level}:</span>` +
+    html += `<div class="row" data-i="${i}">` +
+            (levels ? `<span class="lvl" style="width:${lw}ch">${level}:</span>` : '') +
             `<span class="val">${dispFmt(stack[i], maxChars)}</span></div>`;
   }
   stackEl.innerHTML = html;
@@ -827,7 +839,7 @@ function render() {
 function save() {
   try {
     localStorage.setItem('jcalc.state', JSON.stringify({
-      s: stack.map(d => [d.m.toString(), d.e]), e: entry, deg,
+      s: stack.map(d => [d.m.toString(), d.e]), e: entry, deg, levels,
     }));
   } catch (e) { /* storage unavailable */ }
 }
@@ -838,6 +850,7 @@ function load() {
       stack = st.s.map(([m, e]) => mk(BigInt(m), e));
       entry = typeof st.e === 'string' ? st.e : '';
       if (typeof st.deg === 'boolean') deg = st.deg;
+      if (typeof st.levels === 'boolean') levels = st.levels;
     }
   } catch (e) { stack = []; entry = ''; }
 }
