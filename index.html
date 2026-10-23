@@ -980,6 +980,12 @@ menuEl.addEventListener('pointerdown', e => {
   e.preventDefault();
   setHi(e.target.closest('.mi'));
 });
+menuEl.addEventListener('pointermove', e => {
+  if (sticky && e.pointerType === 'mouse') setHi(e.target.closest('.mi'));
+});
+menuEl.addEventListener('pointerleave', e => {
+  if (sticky && e.pointerType === 'mouse') setHi(null);
+});
 menuEl.addEventListener('pointerup', e => {
   if (!sticky) return;
   const it = e.target.closest('.mi');
@@ -1067,11 +1073,17 @@ function openCtx(target, x, y) {
 const LONG_MS = 450;
 const displayEl = $('display');
 let lp = null;            // pending long-press in the display area
+let ctxDrag = null;       // pointer still held after a long-press opened the menu
 function lpCancel() { if (lp) { clearTimeout(lp.timer); lp = null; } }
 displayEl.addEventListener('pointerdown', e => {
   if (e.button !== 0 || lp || gest) return;
   const t = { id: e.pointerId, x: e.clientX, y: e.clientY, target: e.target };
-  t.timer = setTimeout(() => { lp = null; buzz(); openCtx(t.target, t.x, t.y); }, LONG_MS);
+  t.timer = setTimeout(() => {
+    lp = null;
+    buzz();
+    openCtx(t.target, t.x, t.y);
+    ctxDrag = t.id;
+  }, LONG_MS);
   lp = t;
 });
 displayEl.addEventListener('pointermove', e => {
@@ -1080,6 +1092,25 @@ displayEl.addEventListener('pointermove', e => {
 displayEl.addEventListener('pointerup', lpCancel);
 displayEl.addEventListener('pointercancel', lpCancel);
 displayEl.addEventListener('scroll', lpCancel, true);
+// Slide from the long-press onto a menu item and release to run it; releasing
+// elsewhere leaves the menu open for tapping.
+document.addEventListener('pointermove', e => {
+  if (e.pointerId === ctxDrag) setHi(itemAt(e.clientX, e.clientY));
+});
+document.addEventListener('pointerup', e => {
+  if (e.pointerId !== ctxDrag) return;
+  ctxDrag = null;
+  const it = menuEl.classList.contains('open') && itemAt(e.clientX, e.clientY);
+  if (it) runItem(it);
+  else setHi(null);
+});
+document.addEventListener('pointercancel', e => {
+  if (e.pointerId === ctxDrag) { ctxDrag = null; setHi(null); }
+});
+// Keep the stack from scrolling while sliding to a menu item.
+displayEl.addEventListener('touchmove', e => {
+  if (ctxDrag !== null && e.cancelable) e.preventDefault();
+}, { passive: false });
 displayEl.addEventListener('contextmenu', e => {
   e.preventDefault();
   lpCancel();
