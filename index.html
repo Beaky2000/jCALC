@@ -736,7 +736,7 @@ function toggleLevels() { levels = !levels; update(); }
 
 function store(r) {
   if (!commitEntry()) return update();
-  if (!stack.length) { flash('Too few arguments'); return update(); }
+  if (!stack.length) { flash('Stack empty'); return update(); }
   regs[r] = stack[stack.length - 1];
   flash('Stored in ' + r, true);
   update();
@@ -748,11 +748,12 @@ function recall(r) {
   update();
 }
 // Register menu laid out as A X / B Y / C Z, each with a short value preview.
-function regMenu(fn, dimEmpty) {
+// `dim(r)` tells which items to grey out.
+function regMenu(fn, dim) {
   const item = r => [
     r + ':' + (regs[r] ? `<span class="rv">${dispFmt(regs[r], 7)}</span>` : ''),
     () => fn(r),
-    'reg' + (dimEmpty && !regs[r] ? ' empty' : ''),
+    'reg' + (dim(r) ? ' empty' : ''),
   ];
   return [0, 1, 2].map(i => [item(REGS[i]), item(REGS[i + 3])]);
 }
@@ -770,8 +771,8 @@ const KEYS = [
   { id: '7', main: '7', alt: 'TRIG', tap: digit('7'),
     menu: [[['sin', fSin], ['cos', fCos], ['tan', fTan]],
            [['sin<sup>-1</sup>', fAsin], ['cos<sup>-1</sup>', fAcos], ['tan<sup>-1</sup>', fAtan]]] },
-  { id: '8', main: '8', alt: 'STO', tap: digit('8'), menu: () => regMenu(store, false) },
-  { id: '9', main: '9', alt: 'REC', tap: digit('9'), menu: () => regMenu(recall, true) },
+  { id: '8', main: '8', alt: 'STO', tap: digit('8'), menu: () => regMenu(store, () => !stack.length && !entry) },
+  { id: '9', main: '9', alt: 'RCL', tap: digit('9'), menu: () => regMenu(recall, r => !regs[r]) },
   { id: 'div', main: '÷', cls: 'op', alt: '1/x MOD', tap: fDiv,
     menu: [[['1/x', fInv], ['MOD', fMod]]] },
 
@@ -779,8 +780,8 @@ const KEYS = [
   { id: '4', main: '4', tap: digit('4') },
   { id: '5', main: '5', tap: digit('5') },
   { id: '6', main: '6', tap: digit('6') },
-  { id: 'mul', main: '×', cls: 'op', alt: '√ x² xʸ', tap: fMul,
-    menu: [[['√x', fSqrt], ['x<sup>2</sup>', fSq], ['x<sup>y</sup>', fPow]]] },
+  { id: 'mul', main: '×', cls: 'op', alt: '√ x² yˣ', tap: fMul,
+    menu: [[['√x', fSqrt], ['x<sup>2</sup>', fSq], ['y<sup>x</sup>', fPow]]] },
 
   { id: 'enter', main: 'ENTER', cls: 'enter', alt: 'SWAP ROT', tap: enter,
     menu: [[['SWAP', fSwap], ['ROT↓', rot(true)], ['ROT↑', rot(false)]]] },
