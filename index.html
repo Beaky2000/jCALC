@@ -560,6 +560,113 @@ const asinD = (x, deg) => fromRad(asinRad(x), deg);
 const acosD = (x, deg) => fromRad(acosRad(x), deg);
 const atanD = (x, deg) => fromRad(atanRad(x), deg);
 
+// --- gamma function and combinatorics ---
+const bigGcd = (a, b) => { a = a < 0n ? -a : a; while (b) [a, b] = [b, a % b]; return a; };
+let BERN = null;                 // [num, den] of B_2, B_4, ..., B_50
+function bernoulli() {
+  if (BERN) return BERN;
+  const B = [[1n, 1n]];
+  let row = [1n, 1n];            // binomial row C(m, k) for m = 1
+  for (let m = 1; m <= 50; m++) {
+    const next = [1n];           // advance to row m + 1
+    for (let k = 1; k <= m; k++) next.push(row[k - 1] + row[k]);
+    next.push(1n);
+    row = next;
+    let num = 0n, den = 1n;      // sum of C(m+1, k) B_k for k < m
+    for (let k = 0; k < m; k++) {
+      const [bn, bd] = B[k];
+      num = num * bd + row[k] * bn * den;
+      den *= bd;
+      const g = bigGcd(num, den);
+      num /= g; den /= g;
+    }
+    den *= BigInt(m + 1);
+    const g = bigGcd(num, den);
+    B.push([-num / g, den / g]);
+  }
+  BERN = [];
+  for (let k = 2; k <= 50; k += 2) BERN.push(B[k]);
+  return BERN;
+}
+
+function lnGammaFix(z) {         // Stirling series, z >= 60
+  consts();
+  const zf = toFix(z);
+  let r = (zf - S / 2n) * lnFix(z) / S - zf + lnFix(mk(2n * PI, -FD, FD)) / 2n;
+  const w = S * S / zf, w2 = w * w / S;
+  let wp = w;
+  bernoulli().forEach(([bn, bd], i) => {
+    const k = BigInt(2 * i + 2);
+    r += bn * wp / (bd * k * (k - 1n));
+    wp = wp * w2 / S;
+  });
+  return r;
+}
+
+const GP = P + 15;               // working precision for gamma results
+function gammaPos(x) {           // x >= 0.5
+  let n = 0, z = x;
+  if (mag(x) <= 3 && toFix(x) < 60n * S) {
+    n = 60 - Number(toFix(x) / S);
+    z = add(x, mk(BigInt(n), 0), FD);
+  }
+  let g = expD(mk(lnGammaFix(z), -FD, FD), GP);
+  if (n) {
+    let p = ONE;
+    for (let i = 0; i < n; i++) p = mul(p, add(x, mk(BigInt(i), 0), FD), FD);
+    g = div(g, p, GP);
+  }
+  return g;
+}
+
+function gammaD(x) {
+  consts();
+  if (isInt(x) && x.m <= 0n) throw new Error('Infinite result');
+  if (sub(x, new Dec(5n, -1), FD).m >= 0n) return gammaPos(x);
+  // Reflection: gamma(x) = pi / (sin(pi x) gamma(1 - x)); reduce x exactly first
+  const k = toFix(x) / S, f = sub(x, mk(k, 0), FD);
+  let [s] = sinCosFix(toFix(f) * PI / S);
+  if (k % 2n) s = -s;
+  return div(PI_D, mul(mk(s, -FD, FD), gammaPos(sub(ONE, x, FD)), FD), GP);
+}
+
+function factD(x) {
+  if (isInt(x) && x.m >= 0n && mag(x) <= 4 && x.m * p10(x.e) <= 1000n) {
+    let r = 1n;
+    for (let i = 2n; i <= x.m * p10(x.e); i++) r *= i;
+    return mk(r, 0);
+  }
+  const g = gammaD(add(x, ONE, FD));
+  return mk(g.m, g.e);
+}
+
+function combArgs(n, r) {        // non-negative integers with r <= n
+  if (!isInt(n) || !isInt(r) || n.m < 0n || r.m < 0n || sub(n, r, FD).m < 0n) throw new Error('Bad argument');
+  if (mag(n) > 15) throw new Error('Bad argument');
+  return [n.m * p10(n.e), r.m * p10(r.e)];
+}
+function fallingProd(n, k) {     // n (n-1) ... (n-k+1), exact
+  let p = 1n;
+  for (let i = 0n; i < k; i++) p *= n - i;
+  return p;
+}
+function permD(nd_, rd) {
+  const [n, r] = combArgs(nd_, rd);
+  if (r <= 5000n) return mk(fallingProd(n, r), 0);
+  return div(gammaPos(mk(n + 1n, 0)), gammaPos(mk(n - r + 1n, 0)));
+}
+function combD(nd_, rd) {
+  const [n, r0] = combArgs(nd_, rd);
+  const r = r0 < n - r0 ? r0 : n - r0;
+  if (r <= 5000n) {
+    let f = 1n;
+    for (let i = 2n; i <= r; i++) f *= i;
+    return mk(fallingProd(n, r) / f, 0);
+  }
+  const d = mul(gammaPos(mk(r + 1n, 0)), gammaPos(mk(n - r + 1n, 0)), GP);
+  return div(gammaPos(mk(n + 1n, 0)), d);
+}
+
 // Format with at most `sig` significant digits, using E notation when needed.
 function fmt(a, sig) {
   if (a.m === 0n) return '0';
@@ -714,6 +821,9 @@ const fMul = op(2, (y, x) => [mul(y, x)]);
 const fDiv = op(2, (y, x) => [div(y, x)]);
 const fInv = op(1, x => [div(ONE, x)]);
 const fMod = op(2, (y, x) => [modD(y, x)]);
+const fFact = op(1, x => [factD(x)]);
+const fPerm = op(2, (y, x) => [permD(y, x)]);
+const fComb = op(2, (y, x) => [combD(y, x)]);
 const fSqrt = op(1, x => [sqrtD(x)]);
 const fSq = op(1, x => [mul(x, x)]);
 const fPow = op(2, (y, x) => [powD(y, x)]);
@@ -777,7 +887,8 @@ const KEYS = [
     menu: [[['1/x', fInv], ['MOD', fMod]]] },
 
   { id: 'back', main: '←', cls: 'ctl', tap: back, repeat: true },
-  { id: '4', main: '4', tap: digit('4') },
+  { id: '4', main: '4', alt: 'COMB', tap: digit('4'),
+    menu: [[['x!', fFact], ['<sub>n</sub>P<sub>r</sub>', fPerm], ['<sub>n</sub>C<sub>r</sub>', fComb]]] },
   { id: '5', main: '5', tap: digit('5') },
   { id: '6', main: '6', tap: digit('6') },
   { id: 'mul', main: '×', cls: 'op', alt: '√ x² yˣ', tap: fMul,
