@@ -8,6 +8,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="jCALC">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>jCALC</title>
 <style>
 :root {
@@ -722,6 +725,7 @@ let deg = true;          // angle mode: degrees (true) or radians
 let levels = true;       // show stack level numbers (1:, 2:, ...)
 const REGS = ['A', 'B', 'C', 'X', 'Y', 'Z'];
 let regs = {};           // register name -> Dec
+let undoStack = null;    // stack before the last stack change, or null
 
 const $ = id => document.getElementById(id);
 const stackEl = $('stack'), entryEl = $('entry'), entryTextEl = $('entryText');
@@ -737,11 +741,18 @@ function flash(text, info = false) {
 }
 function clearMsg() { msgEl.classList.remove('show'); }
 
+// Make `before` the undo state if the stack has changed since it was taken.
+function record(before) {
+  if (before.length !== stack.length || before.some((v, i) => v !== stack[i])) undoStack = before;
+}
+
 function commitEntry() {
   if (!entry) return true;
+  const before = stack.slice();
   try { stack.push(parseNum(entry)); }
   catch (e) { flash(e.message); return false; }
   entry = '';
+  record(before);
   return true;
 }
 
@@ -751,9 +762,11 @@ function op(n, f) {
   return () => {
     if (!commitEntry()) return update();
     if (stack.length < n) { flash('Too few arguments'); return update(); }
+    const before = stack.slice();
     try {
       const res = f(...stack.slice(stack.length - n));
       stack.splice(stack.length - n, n, ...res);
+      record(before);
     } catch (e) {
       flash(e instanceof RangeError ? 'Overflow' : e.message);
     }
@@ -775,21 +788,29 @@ function expo() {
 }
 function back() {
   if (entry) entry = entry.slice(0, -1);
-  else if (stack.length) entry = fmt(stack.pop(), P);
+  else if (stack.length) { undoStack = stack.slice(); entry = fmt(stack.pop(), P); }
   else flash('Too few arguments');
   update();
 }
 function drop() {
   if (entry) entry = '';
-  else if (stack.length) stack.pop();
+  else if (stack.length) { undoStack = stack.slice(); stack.pop(); }
   update();
 }
-function clearStack() { entry = ''; stack = []; update(); }
+function clearStack() { entry = ''; stack = []; undoStack = null; update(); }
 function clearStored() { regs = {}; update(); }
-function clearAll() { entry = ''; stack = []; regs = {}; update(); }
+function clearAll() { entry = ''; stack = []; regs = {}; undoStack = null; update(); }
 function enter() {
   if (entry) commitEntry();
-  else if (stack.length) stack.push(stack[stack.length - 1]);
+  else if (stack.length) { undoStack = stack.slice(); stack.push(stack[stack.length - 1]); }
+  update();
+}
+// Single-step undo of the last stack change. With an entry open it only
+// discards the entry.
+function undo() {
+  if (entry) entry = '';
+  else if (!undoStack) flash('Undo unavailable');
+  else { stack = undoStack; undoStack = null; }
   update();
 }
 function chs() {
@@ -808,6 +829,7 @@ function rot(down) {
   return () => {
     if (!commitEntry()) return update();
     if (stack.length > 1) {
+      undoStack = stack.slice();
       if (down) stack.unshift(stack.pop());   // level 1 goes to the top
       else stack.push(stack.shift());         // top comes down to level 1
     }
@@ -854,6 +876,7 @@ function store(r) {
 function recall(r) {
   if (!commitEntry()) return update();
   if (!regs[r]) { flash('Register ' + r + ' is empty'); return update(); }
+  undoStack = stack.slice();
   stack.push(regs[r]);
   update();
 }
@@ -894,8 +917,9 @@ const KEYS = [
   { id: 'mul', main: '×', cls: 'op', alt: '√ x² yˣ', tap: fMul,
     menu: [[['√x', fSqrt], ['x<sup>2</sup>', fSq], ['y<sup>x</sup>', fPow]]] },
 
-  { id: 'enter', main: 'ENTER', cls: 'enter', alt: 'SWAP ROT', tap: enter,
-    menu: [[['SWAP', fSwap], ['ROT↓', rot(true)], ['ROT↑', rot(false)]]] },
+  { id: 'enter', main: 'ENTER', cls: 'enter', alt: 'STACK', tap: enter,
+    menu: () => [[['SWAP', fSwap], ['ROT↓', rot(true)], ['ROT↑', rot(false)]],
+                 [['UNDO', undo, undoStack || entry ? '' : 'empty']]] },
   { id: '1', main: '1', tap: digit('1') },
   { id: '2', main: '2', tap: digit('2') },
   { id: '3', main: '3', tap: digit('3') },
@@ -985,6 +1009,7 @@ function save() {
   try {
     localStorage.setItem('jcalc.state', JSON.stringify({
       s: stack.map(d => [d.m.toString(), d.e]), e: entry, deg, levels,
+      u: undoStack && undoStack.map(d => [d.m.toString(), d.e]),
       r: Object.fromEntries(Object.entries(regs).map(([k, d]) => [k, [d.m.toString(), d.e]])),
     }));
   } catch (e) { /* storage unavailable */ }
@@ -997,9 +1022,10 @@ function load() {
       entry = typeof st.e === 'string' ? st.e : '';
       if (typeof st.deg === 'boolean') deg = st.deg;
       if (typeof st.levels === 'boolean') levels = st.levels;
+      if (Array.isArray(st.u)) undoStack = st.u.map(([m, e]) => mk(BigInt(m), e));
       if (st.r) for (const k of REGS) if (st.r[k]) regs[k] = mk(BigInt(st.r[k][0]), st.r[k][1]);
     }
-  } catch (e) { stack = []; entry = ''; }
+  } catch (e) { stack = []; entry = ''; undoStack = null; }
 }
 
 function update() { render(); save(); }
@@ -1209,7 +1235,7 @@ function openCtx(target, x, y) {
     const v = stack[row.dataset.i], r = cleanRound(v);
     if (r) items.push(['→ ' + fitFmt(r, 18), () => {
       const i = stack.indexOf(v);
-      if (i >= 0) { stack[i] = r; update(); }
+      if (i >= 0) { undoStack = stack.slice(); stack[i] = r; update(); }
     }]);
   }
   showMenu([items], x, y - 16, y + 16);
@@ -1285,6 +1311,10 @@ document.addEventListener('keydown', e => {
     if (s) { e.preventDefault(); copyText(s); }
     return;
   }
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault(); closeMenu(); clearMsg(); undo();
+    return;
+  }
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key;
   let fn = null;
@@ -1311,6 +1341,12 @@ if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { me
 load();
 measure();
 render();
+
+// Offline support (installable web app). Service workers only run over http(s),
+// so this is skipped when the file is opened directly from disk.
+if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>

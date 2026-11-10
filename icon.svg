@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- jCALC app icon: a stack display above an ENTER key. Full-bleed square; iOS applies its own rounded mask. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b1e24"/>
+      <stop offset="1" stop-color="#0e1013"/>
+    </linearGradient>
+    <linearGradient id="enter" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e89240"/>
+      <stop offset="1" stop-color="#d27a24"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" fill="url(#bg)"/>
+
+  <!-- display panel -->
+  <rect x="192" y="176" width="640" height="392" rx="56" fill="#20242b"/>
+
+  <!-- stack rows (level 3, 2, 1), right-aligned like the app -->
+  <rect x="552" y="240" width="220" height="36" rx="18" fill="#59616c"/>
+  <rect x="240" y="320" width="544" height="6" rx="3" fill="#2c313a"/>
+  <rect x="452" y="358" width="320" height="36" rx="18" fill="#7d8591"/>
+  <rect x="240" y="438" width="544" height="6" rx="3" fill="#2c313a"/>
+  <rect x="312" y="474" width="460" height="52" rx="26" fill="#e8eaed"/>
+
+  <!-- ENTER key -->
+  <rect x="192" y="624" width="640" height="224" rx="56" fill="url(#enter)"/>
+  <path d="M652 676 V760 H384 M444 700 L384 760 L444 820"
+        fill="none" stroke="#1d1206" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
